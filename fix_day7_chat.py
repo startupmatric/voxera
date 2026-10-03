@@ -1,4 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from pathlib import Path
+
+FILES = {}
+
+FILES["backend/app/schemas/chat.py"] = '''from pydantic import BaseModel, Field
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant|system|tool)$")
+    content: str
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    history: list[ChatMessage] | None = None
+    enable_tools: bool = True
+
+
+class ChatResponse(BaseModel):
+    response: str
+    version: int
+    meta: dict
+    tool_traces: list[dict] = []
+'''
+
+FILES["backend/app/routers/chat.py"] = '''from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_tenant
@@ -70,3 +95,12 @@ async def chat_with_agent(
         meta=result["meta"],
         tool_traces=result.get("tool_traces") or [],
     )
+'''
+
+for path, content in FILES.items():
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+    print(f"wrote {path}")
+
+print(f"\nTotal: {len(FILES)} files")

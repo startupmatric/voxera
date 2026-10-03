@@ -1,4 +1,6 @@
-import os
+from pathlib import Path
+
+content = '''import os
 
 import httpx
 
@@ -30,11 +32,7 @@ async def chat(
         "model": model,
         "messages": messages,
         "stream": False,
-        "options": {
-            "temperature": temperature,
-            "num_predict": 200,   # cap response length; keeps CPU latency sane
-            "num_ctx": 4096,      # context window
-        },
+        "options": {"temperature": temperature},
     }
     if tools:
         payload["tools"] = tools
@@ -88,3 +86,8 @@ async def list_models() -> list[str]:
             return [m["name"] for m in data.get("models", [])]
     except Exception:
         return []
+'''
+
+Path("backend/app/runtime/ollama_client.py").write_text(content, encoding="utf-8")
+print("Wrote ollama_client.py")
+print("Has tool_calls:", "tool_calls" in content)

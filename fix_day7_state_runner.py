@@ -1,4 +1,33 @@
-import time
+from pathlib import Path
+
+state_content = '''from typing import TypedDict
+
+
+class AgentState(TypedDict, total=False):
+    agent_id: str
+    agent_name: str
+    version: int
+    system_prompt: str
+    model_name: str
+    temperature: float
+
+    messages: list[dict]
+    tool_schemas: list[dict] | None
+    tool_ctx: dict
+    traces: list[dict]
+    tool_hops: int
+
+    last_content: str
+    last_tool_calls: list[dict]
+
+    response: str
+    meta: dict
+'''
+
+Path("backend/app/runtime/state.py").write_text(state_content, encoding="utf-8")
+print("Wrote state.py")
+
+runner_content = '''import time
 
 from ..models import Agent, AgentVersion, Trace
 from .graph import get_graph
@@ -87,3 +116,8 @@ async def run_agent(
         "version": version_number,
         "tool_traces": final.get("traces") or [],
     }
+'''
+
+Path("backend/app/runtime/runner.py").write_text(runner_content, encoding="utf-8")
+print("Wrote runner.py")
+print("Has tool ctx:", "tool_ctx" in runner_content)

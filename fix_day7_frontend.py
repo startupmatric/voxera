@@ -1,4 +1,6 @@
-window.Views = window.Views || {};
+from pathlib import Path
+
+content = '''window.Views = window.Views || {};
 window.Views.AgentChat = (() => {
   let history = [];
 
@@ -100,3 +102,8 @@ window.Views.AgentChat = (() => {
 
   return { render };
 })();
+'''
+
+Path("frontend/js/views/chat.js").write_text(content, encoding="utf-8")
+print("Wrote chat.js")
+print("Has tool_traces:", "tool_traces" in content)

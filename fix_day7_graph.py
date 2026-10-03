@@ -1,4 +1,6 @@
-import json
+from pathlib import Path
+
+content = '''import json
 import time
 from typing import Any
 
@@ -126,3 +128,8 @@ def get_graph():
     if _graph is None:
         _graph = build_graph()
     return _graph
+'''
+
+Path("backend/app/runtime/graph.py").write_text(content, encoding="utf-8")
+print("Wrote graph.py")
+print("Has tool loop:", "_tool_node" in content)
