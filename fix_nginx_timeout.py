@@ -1,4 +1,6 @@
-server {
+from pathlib import Path
+
+content = """server {
     listen 80;
     server_name _;
 
@@ -21,3 +23,9 @@ server {
         proxy_connect_timeout 30s;
     }
 }
+"""
+
+p = Path("docker/nginx.conf")
+p.write_text(content, encoding="utf-8")
+print("Wrote", p)
+print("First 6 bytes:", p.read_bytes()[:6].hex(" "))

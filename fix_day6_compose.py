@@ -1,4 +1,6 @@
-services:
+from pathlib import Path
+
+content = '''services:
   voxera-frontend:
     build:
       context: .
@@ -38,8 +40,6 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_KEEP_ALIVE=24h
     restart: unless-stopped
 
   postgres:
@@ -74,3 +74,8 @@ services:
 volumes:
   pgdata:
   ollama_data:
+'''
+
+p = Path("docker-compose.yml")
+p.write_text(content, encoding="utf-8")
+print("Wrote", p)

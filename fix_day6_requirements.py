@@ -1,4 +1,6 @@
-fastapi==0.115.0
+from pathlib import Path
+
+content = '''fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
 pydantic[email]==2.9.2
@@ -15,3 +17,7 @@ python-multipart==0.0.12
 langgraph==0.2.45
 langchain-core==0.3.15
 httpx==0.27.2
+'''
+
+Path("backend/requirements.txt").write_text(content, encoding="utf-8")
+print("Wrote backend/requirements.txt")

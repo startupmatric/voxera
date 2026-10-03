@@ -1,4 +1,6 @@
-services:
+from pathlib import Path
+
+content = '''services:
   voxera-frontend:
     build:
       context: .
@@ -74,3 +76,9 @@ services:
 volumes:
   pgdata:
   ollama_data:
+'''
+
+Path("docker-compose.yml").write_text(content, encoding="utf-8")
+text = Path("docker-compose.yml").read_text(encoding="utf-8")
+print("Wrote docker-compose.yml")
+print("Contains OLLAMA_KEEP_ALIVE:", "OLLAMA_KEEP_ALIVE" in text)

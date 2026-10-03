@@ -1,39 +1,73 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxera</title>
   <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
 </head>
 <body>
-  <main class="card">
-    <h1>VOXERA</h1>
-    <p class="tagline">AI Voice Agent Platform</p>
+  <div id="login-screen" class="login-screen">
+    <main class="card">
+      <h1>VOXERA</h1>
+      <p class="tagline">AI Voice Agent Platform</p>
+      <div class="status" id="login-status">System Online</div>
 
-    <div class="status" id="overall">System Online</div>
+      <form class="auth" onsubmit="return false;">
+        <label>
+          <span>Email</span>
+          <input type="email" id="email" autocomplete="username" required />
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" id="password" autocomplete="current-password" required minlength="6" />
+        </label>
+        <label>
+          <span>Org name <small>(only for signup)</small></span>
+          <input type="text" id="org" placeholder="Acme Motors" />
+        </label>
+        <div class="buttons">
+          <button type="button" id="btn-login">Login</button>
+          <button type="button" id="btn-register">Sign up</button>
+        </div>
+      </form>
+      <div class="result" id="login-result">Not authenticated</div>
+    </main>
+  </div>
 
-    <form id="auth-form" class="auth" onsubmit="return false;">
-      <label>
-        <span>Email</span>
-        <input type="email" id="email" autocomplete="username" required />
-      </label>
-      <label>
-        <span>Password</span>
-        <input type="password" id="password" autocomplete="current-password" required minlength="6" />
-      </label>
-      <label>
-        <span>Org name <small>(only for signup)</small></span>
-        <input type="text" id="org" placeholder="Acme Motors" />
-      </label>
-      <div class="buttons">
-        <button type="button" id="btn-login">Login</button>
-        <button type="button" id="btn-register">Sign up</button>
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="brand">VOXERA</div>
+      <div class="spacer"></div>
+      <select id="tenant-switcher" class="tenant-switcher" title="Current tenant"></select>
+      <div class="user-info">
+        <span id="user-email">--</span>
+        <span id="user-role" class="badge">--</span>
       </div>
-    </form>
+      <button id="btn-logout" class="btn-ghost">Logout</button>
+    </header>
 
-    <div class="result" id="result">Not authenticated</div>
-  </main>
+    <aside class="sidebar">
+      <nav id="nav"></nav>
+    </aside>
+
+    <main class="content" id="view"></main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="js/toast.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/views/overview.js"></script>
+  <script src="js/views/agents.js"></script>
+  <script src="js/views/agent-detail.js"></script>
+  <script src="js/views/chat.js"></script>
+  <script src="js/views/placeholder.js"></script>
+  <script src="js/views/settings.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

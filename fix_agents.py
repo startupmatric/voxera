@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from pathlib import Path
+
+content = '''from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -245,3 +247,10 @@ def rollback_version(
     db: Session = Depends(get_db),
 ):
     return activate_version(agent_id, version_id, user, tenant, db)
+'''
+
+p = Path("backend/app/routers/agents.py")
+p.write_text(content, encoding="utf-8")
+print(f"Wrote {p}")
+print("First 10 chars:", content[:10])
+print("Contains marker:", "Apply the updates to the agent FIRST" in content)

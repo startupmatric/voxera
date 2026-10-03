@@ -19,3 +19,9 @@ node_modules/
 *.log
 
 pgdata/
+warm.json
+reg.json
+org-a.json
+tenant-a.json
+agent-a.json
+token.txt

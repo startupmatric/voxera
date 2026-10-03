@@ -1,4 +1,35 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from pathlib import Path
+
+FILES = {}
+
+# ---------- schemas/agent_version.py ----------
+FILES["backend/app/schemas/agent_version.py"] = '''from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
+
+
+class AgentVersionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    agent_id: str
+    version: int
+    system_prompt: str | None
+    model_name: str
+    temperature: float
+    configuration: dict
+    is_active: bool
+    created_at: datetime
+
+
+class AgentVersionDiff(BaseModel):
+    from_version: int
+    to_version: int
+    changes: list[dict]
+'''
+
+# ---------- routers/agents.py ----------
+FILES["backend/app/routers/agents.py"] = '''from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -130,11 +161,6 @@ def update_agent(
     if not updates:
         return agent
 
-    # Apply the updates to the agent FIRST
-    for k, v in updates.items():
-        setattr(agent, k, v)
-
-    # Then snapshot the NEW state into a new draft version
     next_n = _next_version_number(db, agent.id)
     draft = AgentVersion(
         agent_id=agent.id,
@@ -143,6 +169,9 @@ def update_agent(
         **_snapshot_agent(agent),
     )
     db.add(draft)
+
+    for k, v in updates.items():
+        setattr(agent, k, v)
 
     db.commit()
     db.refresh(agent)
@@ -244,4 +273,17 @@ def rollback_version(
     tenant: Tenant = Depends(get_current_tenant),
     db: Session = Depends(get_db),
 ):
+    # Rollback uses the same mechanics as activate.
     return activate_version(agent_id, version_id, user, tenant, db)
+'''
+
+# ---------- main.py (add schemas dir import if needed) ----------
+FILES["backend/app/schemas/__init__.py"] = ""
+
+for path, content in FILES.items():
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+    print(f"wrote {path}")
+
+print(f"\nTotal backend files: {len(FILES)}")

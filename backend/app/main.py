@@ -1,12 +1,12 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .auth import router as auth_router
 from .config import settings
 from .database import check_database, check_redis
-from .routers import agents, organizations, tenants, users
+from .routers import agents, chat, me, organizations, tenants, users
 
-app = FastAPI(title=settings.app_name, version="0.3.0")
+app = FastAPI(title=settings.app_name, version="0.6.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,11 +34,13 @@ def health_redis():
 
 @app.get("/")
 def root():
-    return {"service": settings.app_name, "env": settings.app_env, "version": "0.3.0"}
+    return {"service": settings.app_name, "env": settings.app_env, "version": "0.6.0"}
 
 
 app.include_router(auth_router.router)
+app.include_router(me.router)
 app.include_router(organizations.router)
 app.include_router(users.router)
 app.include_router(tenants.router)
 app.include_router(agents.router)
+app.include_router(chat.router)

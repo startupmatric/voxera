@@ -1,119 +1,87 @@
-﻿const API_BASE = "/api";
-const TOKEN_KEY = "voxera_token";
+window.App = (() => {
+  let bootstrapped = false;
 
-function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-function setToken(t) {
-  if (t) localStorage.setItem(TOKEN_KEY, t);
-  else localStorage.removeItem(TOKEN_KEY);
-}
-
-async function api(path, opts = {}) {
-  const headers = Object.assign(
-    { "Content-Type": "application/json" },
-    opts.headers || {}
-  );
-  const tok = getToken();
-  if (tok) headers["Authorization"] = "Bearer " + tok;
-
-  const res = await fetch(API_BASE + path, Object.assign({}, opts, { headers }));
-  const text = await res.text();
-  let body;
-  try { body = text ? JSON.parse(text) : null; } catch (e) { body = text; }
-  if (!res.ok) {
-    const err = new Error((body && body.detail) || ("HTTP " + res.status));
-    err.status = res.status;
-    err.body = body;
-    throw err;
-  }
-  return body;
-}
-
-function $(id) { return document.getElementById(id); }
-
-function setResult(msg) {
-  $("result").textContent = msg;
-}
-
-async function checkHealth() {
-  const endpoints = {
-    api: API_BASE + "/health",
-    db: API_BASE + "/health/database",
-    redis: API_BASE + "/health/redis",
-  };
-  const results = await Promise.all(
-    Object.keys(endpoints).map(async function (k) {
-      try {
-        const r = await fetch(endpoints[k]);
-        const d = await r.json();
-        return d.status === "ok";
-      } catch (e) {
-        return false;
-      }
-    })
-  );
-  const allOk = results.every(Boolean);
-  const el = $("overall");
-  el.textContent = allOk ? "System Online" : "Degraded";
-  el.style.color = allOk ? "var(--accent)" : "var(--error)";
-}
-
-$("btn-login").addEventListener("click", async function () {
-  const email = $("email").value.trim();
-  const password = $("password").value;
-  if (!email || !password) { setResult("Email and password required"); return; }
-  try {
-    const data = await api("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email: email, password: password }),
+  function renderTenantSwitcher() {
+    const sel = document.getElementById("tenant-switcher");
+    sel.innerHTML = "";
+    const list = State.tenants || [];
+    if (list.length === 0) {
+      const opt = document.createElement("option");
+      opt.textContent = "(no tenants)";
+      opt.disabled = true;
+      sel.appendChild(opt);
+      return;
+    }
+    list.forEach((t) => {
+      const opt = document.createElement("option");
+      opt.value = t.id;
+      opt.textContent = t.name;
+      if (t.id === State.tenantId) opt.selected = true;
+      sel.appendChild(opt);
     });
-    setToken(data.access_token);
-    const me = await api("/auth/me");
-    setResult("Logged in as " + me.email + " (" + me.role + ")");
-  } catch (e) {
-    setToken(null);
-    setResult("Login failed: " + e.message);
+    sel.onchange = () => {
+      State.setTenantId(sel.value);
+      window.Toast.info("Tenant switched");
+      Router.render();
+    };
   }
-});
 
-$("btn-register").addEventListener("click", async function () {
-  const email = $("email").value.trim();
-  const password = $("password").value;
-  const organization_name = $("org").value.trim();
-  if (!email || !password || !organization_name) {
-    setResult("Email, password and org name required");
-    return;
+  function renderHeader() {
+    document.getElementById("user-email").textContent =
+      (State.user && State.user.email) || "--";
+    const roleEl = document.getElementById("user-role");
+    const role = (State.user && State.user.role) || "--";
+    roleEl.textContent = role;
+    roleEl.className = "badge" + (role === "admin" ? " admin" : role === "member" ? " member" : "");
   }
-  try {
-    const data = await api("/auth/register", {
-      method: "POST",
-      body: JSON.stringify({
-        email: email,
-        password: password,
-        organization_name: organization_name,
-      }),
-    });
-    setToken(data.access_token);
-    const me = await api("/auth/me");
-    setResult("Registered + logged in as " + me.email + " (" + me.role + ")");
-  } catch (e) {
-    setToken(null);
-    setResult("Register failed: " + e.message);
-  }
-});
 
-(async function () {
-  await checkHealth();
-  const tok = getToken();
-  if (tok) {
+  async function fetchBootstrapData() {
+    const me = await API.get("/auth/me");
+    State.setUser(me);
+
+    const org = await API.get(`/organizations/${me.organization_id}`).catch(() => null);
+    if (org) State.setOrg(org);
+
+    const tenants = await API.get(`/tenants?organization_id=${me.organization_id}`);
+    State.setTenants(tenants);
+  }
+
+  async function bootstrap() {
     try {
-      const me = await api("/auth/me");
-      setResult("Logged in as " + me.email + " (" + me.role + ")");
+      await fetchBootstrapData();
     } catch (e) {
-      setToken(null);
-      setResult("Session expired, please login");
+      window.Toast.error("Failed to load session: " + e.message);
+      Auth.logout(true);
+      return;
+    }
+    renderHeader();
+    renderTenantSwitcher();
+    if (!bootstrapped) {
+      Router.start();
+      bootstrapped = true;
+    } else {
+      Router.render();
     }
   }
+
+  async function start() {
+    Auth.bindUI();
+    await Auth.checkHealth();
+
+    if (State.token) {
+      try {
+        await bootstrap();
+        document.getElementById("login-screen").classList.add("hidden");
+        document.getElementById("app").classList.remove("hidden");
+        return;
+      } catch (e) {
+        State.clear();
+      }
+    }
+    Auth.setLoginStatus("Not authenticated");
+  }
+
+  return { start, bootstrap };
 })();
+
+document.addEventListener("DOMContentLoaded", () => window.App.start());
