@@ -8,6 +8,8 @@ from .calendar_event import CalendarEvent
 from .customer import Customer
 from .lead import Lead
 from .trace import Trace
+from .call import Call
+from .message import Message
 
 __all__ = [
     "Base",
@@ -20,4 +22,6 @@ __all__ = [
     "Customer",
     "Lead",
     "Trace",
+    "Call",
+    "Message",
 ]

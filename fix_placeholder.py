@@ -1,4 +1,6 @@
-﻿window.Views = window.Views || {};
+﻿from pathlib import Path
+
+content = """window.Views = window.Views || {};
 
 function makePlaceholder(name, description) {
   return {
@@ -20,3 +22,8 @@ window.Views.Traces      = makePlaceholder("Traces", "Step-by-step execution tra
 window.Views.Tools       = makePlaceholder("Tools", "Function tools available to agents -- calendar, CRM, custom HTTP endpoints.");
 window.Views.Evaluations = makePlaceholder("Evaluations", "Automated quality scoring and regression tests against agent versions.");
 window.Views.Knowledge   = makePlaceholder("Knowledge", "Vector-indexed documents and chunks used for retrieval-augmented agents.");
+"""
+
+p = Path("frontend/js/views/placeholder.js")
+p.write_text(content, encoding="utf-8")
+print("Wrote placeholder.js -- Calls line removed")
