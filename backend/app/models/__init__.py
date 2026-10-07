@@ -10,6 +10,13 @@ from .lead import Lead
 from .trace import Trace
 from .call import Call
 from .message import Message
+from .evaluation import (
+    EvaluationDataset,
+    EvaluationCase,
+    EvaluationRun,
+    EvaluationResult,
+)
+from .debug_report import DebugReport
 
 __all__ = [
     "Base",
@@ -24,4 +31,9 @@ __all__ = [
     "Trace",
     "Call",
     "Message",
+    "EvaluationDataset",
+    "EvaluationCase",
+    "EvaluationRun",
+    "EvaluationResult",
+    "DebugReport",
 ]

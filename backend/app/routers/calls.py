@@ -241,9 +241,18 @@ def get_call_latency(
 ):
     call = _load_call_for_tenant(db, call_id, tenant.id)
 
+    # Match traces by call_id OR by time window (for legacy calls with null call_id)
     rows = (
         db.query(Trace)
-        .filter(Trace.call_id == call_id)
+        .filter(
+            (Trace.call_id == call_id) |
+            (
+                (Trace.call_id.is_(None)) &
+                (Trace.agent_id == call.agent_id) &
+                (Trace.created_at >= call.created_at) &
+                (Trace.created_at <= call.updated_at)
+            )
+        )
         .all()
     )
 

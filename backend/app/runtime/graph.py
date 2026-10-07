@@ -170,6 +170,16 @@ async def _llm_node(state: AgentState) -> AgentState:
         "prompt_tokens": result["prompt_eval_count"],
         "completion_tokens": result["eval_count"],
     }
+    # Record an LLM trace for latency attribution
+    state.setdefault("traces", []).append({
+        "kind": "llm",
+        "name": "ollama.generate",
+        "status": "success",
+        "input": {"messages": len(messages)},
+        "output": {"eval_count": result.get("eval_count", 0)},
+        "error": None,
+        "latency_ms": float(result.get("total_duration_ms", 0)),
+    })
     return state
 
 

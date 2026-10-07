@@ -80,3 +80,10 @@ fix_piper_http.py
 fix_tool_fallback.py
 fix_whisper_silence.py
 skip_two_tests.py
+
+# Test payloads (local)
+call_body.json
+msg_body.json
+doc_body.json
+search_body.json
+*.body.json
