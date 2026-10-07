@@ -1,4 +1,4 @@
-services:
+﻿services:
   voxera-frontend:
     build:
       context: .
@@ -23,12 +23,18 @@ services:
       - ./backend/alembic.ini:/app/alembic.ini
     environment:
       - OLLAMA_URL=http://ollama:11434
+      - WHISPER_URL=http://whisper:9000
+      - PIPER_URL=http://piper:8000
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       ollama:
+        condition: service_started
+      whisper:
+        condition: service_started
+      piper:
         condition: service_started
 
   ollama:
@@ -40,6 +46,30 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_KEEP_ALIVE=24h
+    restart: unless-stopped
+
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    container_name: voxera-whisper
+    ports:
+      - "9000:9000"
+    environment:
+      - ASR_MODEL=base.en
+      - ASR_ENGINE=openai_whisper
+    volumes:
+      - whisper_models:/root/.cache/whisper
+    restart: unless-stopped
+
+  piper:
+    image: ghcr.io/matatonic/openedai-speech:latest
+    container_name: voxera-piper
+    ports:
+      - "5000:8000"
+    volumes:
+      - piper_data:/app/voices
+    environment:
+      - TTS_HOME=/app/voices
+      - HF_HOME=/app/voices
     restart: unless-stopped
 
   postgres:
@@ -74,3 +104,5 @@ services:
 volumes:
   pgdata:
   ollama_data:
+  whisper_models:
+  piper_data:

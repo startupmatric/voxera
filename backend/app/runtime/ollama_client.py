@@ -11,7 +11,7 @@ async def chat(
     model: str = DEFAULT_MODEL,
     temperature: float = 0.7,
     tools: list[dict] | None = None,
-    timeout: float = 300.0,
+    timeout: float = 900.0,
 ) -> dict:
     """
     Chat with Ollama. Optionally pass a list of tool schemas to enable tool calling.
@@ -32,7 +32,7 @@ async def chat(
         "stream": False,
         "options": {
             "temperature": temperature,
-            "num_predict": 200,   # cap response length; keeps CPU latency sane
+            "num_predict": 512,   # cap response length; keeps CPU latency sane
             "num_ctx": 4096,      # context window
         },
     }

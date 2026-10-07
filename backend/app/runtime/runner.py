@@ -14,11 +14,18 @@ def active_version_for(agent: Agent, db) -> AgentVersion | None:
     )
 
 
-def _persist_traces(db, tenant_id: str, agent_id: str, traces: list[dict]) -> None:
+def _persist_traces(
+    db,
+    tenant_id: str,
+    agent_id: str,
+    call_id: str | None,
+    traces: list[dict],
+) -> None:
     for t in traces or []:
         row = Trace(
             tenant_id=tenant_id,
             agent_id=agent_id,
+            call_id=call_id,
             kind=t.get("kind", "tool"),
             name=t.get("name", "unknown"),
             status=t.get("status", "success"),
@@ -37,6 +44,7 @@ async def run_agent(
     user_message: str,
     history: list[dict] | None = None,
     enable_tools: bool = True,
+    call_id: str | None = None,
 ) -> dict:
     version = active_version_for(agent, db)
 
@@ -75,7 +83,13 @@ async def run_agent(
     final = await graph.ainvoke(state)
     total_ms = int((time.time() - t0) * 1000)
 
-    _persist_traces(db, agent.tenant_id, agent.id, final.get("traces") or [])
+    _persist_traces(
+        db,
+        agent.tenant_id,
+        agent.id,
+        call_id,
+        final.get("traces") or [],
+    )
 
     return {
         "response": final.get("last_content", ""),

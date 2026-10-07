@@ -15,7 +15,10 @@ class Trace(Base, TimestampMixin):
     agent_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    kind: Mapped[str] = mapped_column(String(30), nullable=False)      # "tool" | "llm" | "run"
+    call_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("calls.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="success", nullable=False)
     input_data: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)

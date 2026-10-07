@@ -1,4 +1,4 @@
-import asyncio
+import base64
 import json
 from datetime import datetime
 
@@ -7,14 +7,15 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from ..auth.security import decode_access_token
 from ..database import SessionLocal
 from ..models import Agent, Call, Message, Tenant, User
+from ..runtime.piper_client import synthesize as piper_synthesize
 from ..runtime.runner import run_agent
+from ..runtime.whisper_client import transcribe as whisper_transcribe
 
 router = APIRouter()
 
-
-def _send(ws: WebSocket, payload: dict) -> None:
-    # FastAPI WebSocket send_json is async; wrap in a task when called from sync code
-    pass
+# Per-connection audio buffer is keyed by the WebSocket object; simplest is a
+# local dict inside the connection handler.
+MAX_AUDIO_BYTES = 25 * 1024 * 1024  # 25 MB safety cap
 
 
 @router.websocket("/ws/calls/{agent_id}")
@@ -36,6 +37,7 @@ async def call_ws(websocket: WebSocket, agent_id: str, token: str = ""):
         return
 
     db = SessionLocal()
+    audio_buffer = bytearray()
     try:
         user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
         if not user:
@@ -58,17 +60,13 @@ async def call_ws(websocket: WebSocket, agent_id: str, token: str = ""):
             await websocket.close(code=4404)
             return
 
-        # --- Create the Call row
         call = Call(tenant_id=agent.tenant_id, agent_id=agent.id, status="active", channel="websocket")
         db.add(call)
         db.commit()
         db.refresh(call)
 
         greeting = f"Hi! I'm {agent.name}. How can I help you today?"
-        greeting_msg = Message(
-            call_id=call.id, role="assistant", content=greeting, tool_traces=[], meta={"greeting": True}
-        )
-        db.add(greeting_msg)
+        db.add(Message(call_id=call.id, role="assistant", content=greeting, tool_traces=[], meta={"greeting": True}))
         db.commit()
 
         await websocket.send_json({
@@ -78,32 +76,16 @@ async def call_ws(websocket: WebSocket, agent_id: str, token: str = ""):
             "greeting": greeting,
         })
 
-        # --- Conversation loop
-        while True:
-            raw = await websocket.receive_text()
-            try:
-                msg = json.loads(raw)
-            except Exception:
-                await websocket.send_json({"type": "error", "detail": "Invalid JSON"})
-                continue
-
-            if msg.get("type") == "end_call":
-                call.status = "ended"
-                db.commit()
-                await websocket.send_json({"type": "call_ended", "call_id": call.id})
-                break
-
-            if msg.get("type") != "user_message":
-                await websocket.send_json({"type": "error", "detail": "Unknown message type"})
-                continue
-
-            content = (msg.get("content") or "").strip()
+        # ------------------------------------------------------------------
+        # Helpers used by the loop
+        # ------------------------------------------------------------------
+        async def handle_text(content: str):
+            content = content.strip()
             if not content:
-                continue
+                return
 
             # Persist user message
-            user_msg = Message(call_id=call.id, role="user", content=content)
-            db.add(user_msg)
+            db.add(Message(call_id=call.id, role="user", content=content))
             db.commit()
 
             await websocket.send_json({"type": "user_message", "content": content})
@@ -123,14 +105,12 @@ async def call_ws(websocket: WebSocket, agent_id: str, token: str = ""):
             ]
 
             try:
-                result = await run_agent(
-                    agent, db, content, history=history[:-1], enable_tools=True
-                )
+                result = await run_agent(agent, db, content, history=history[:-1], enable_tools=True)
             except Exception as e:
                 await websocket.send_json({"type": "error", "detail": f"Runtime error: {e}"})
-                continue
+                return
 
-            # Emit tool events (from the traces recorded during this turn)
+            # Emit tool events
             for t in result.get("tool_traces") or []:
                 await websocket.send_json({
                     "type": "tool_call",
@@ -138,7 +118,7 @@ async def call_ws(websocket: WebSocket, agent_id: str, token: str = ""):
                     "status": t.get("status"),
                 })
 
-            # Persist the assistant message
+            # Persist assistant message
             assistant_msg = Message(
                 call_id=call.id,
                 role="assistant",
@@ -149,13 +129,100 @@ async def call_ws(websocket: WebSocket, agent_id: str, token: str = ""):
             db.add(assistant_msg)
             db.commit()
 
-            await websocket.send_json({
+            # TTS: convert response to audio (if TTS is enabled)
+            audio_b64 = None
+            try:
+                wav_bytes = await piper_synthesize(result["response"])
+                audio_b64 = base64.b64encode(wav_bytes).decode("ascii")
+            except Exception as e:
+                # TTS failure is non-fatal — the browser will just show text
+                print(f"[piper] TTS failed: {e}")
+
+            out = {
                 "type": "assistant_message",
                 "content": result["response"],
                 "version": result["version"],
                 "meta": result.get("meta") or {},
                 "tool_traces": result.get("tool_traces") or [],
+            }
+            if audio_b64:
+                out["audio"] = audio_b64
+                out["audio_format"] = "wav"
+            await websocket.send_json(out)
+
+        async def handle_audio_end():
+            nonlocal audio_buffer
+            if not audio_buffer:
+                await websocket.send_json({"type": "error", "detail": "Empty audio"})
+                return
+            if len(audio_buffer) > MAX_AUDIO_BYTES:
+                await websocket.send_json({"type": "error", "detail": "Audio too large"})
+                audio_buffer = bytearray()
+                return
+
+            audio_bytes = bytes(audio_buffer)
+            audio_buffer = bytearray()
+
+            await websocket.send_json({"type": "stt_started"})
+            try:
+                transcript = await whisper_transcribe(audio_bytes)
+            except Exception as e:
+                await websocket.send_json({"type": "error", "detail": f"STT failed: {e}"})
+                return
+
+            await websocket.send_json({
+                "type": "transcript",
+                "content": transcript,
             })
+
+            if transcript:
+                await handle_text(transcript)
+            else:
+                await websocket.send_json({"type": "error", "detail": "No speech detected"})
+
+        # ------------------------------------------------------------------
+        # Main loop
+        # ------------------------------------------------------------------
+        while True:
+            raw = await websocket.receive_text()
+            try:
+                msg = json.loads(raw)
+            except Exception:
+                await websocket.send_json({"type": "error", "detail": "Invalid JSON"})
+                continue
+
+            mtype = msg.get("type")
+
+            if mtype == "end_call":
+                call.status = "ended"
+                db.commit()
+                await websocket.send_json({"type": "call_ended", "call_id": call.id})
+                break
+
+            if mtype == "user_message":
+                await handle_text(msg.get("content") or "")
+                continue
+
+            if mtype == "audio_chunk":
+                chunk_b64 = msg.get("audio") or ""
+                try:
+                    chunk = base64.b64decode(chunk_b64)
+                except Exception:
+                    await websocket.send_json({"type": "error", "detail": "Invalid audio chunk"})
+                    continue
+                audio_buffer.extend(chunk)
+                continue
+
+            if mtype == "audio_end":
+                await handle_audio_end()
+                continue
+
+            if mtype == "audio_cancel":
+                audio_buffer = bytearray()
+                await websocket.send_json({"type": "audio_cancelled"})
+                continue
+
+            await websocket.send_json({"type": "error", "detail": f"Unknown message type: {mtype}"})
 
     except WebSocketDisconnect:
         pass

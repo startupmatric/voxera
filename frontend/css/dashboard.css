@@ -313,3 +313,33 @@ button.btn:hover { opacity: 0.9; }
 .chat-input button {
   min-width: 90px;
 }
+
+
+/* Day 8B - voice UI */
+.voice-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  user-select: none;
+}
+
+.voice-toggle input {
+  accent-color: var(--accent);
+}
+
+#ptt-btn {
+  min-width: 160px;
+}
+
+#ptt-btn.recording {
+  background: var(--error);
+  color: white;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  50%      { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+}

@@ -35,6 +35,13 @@ window.Router = (() => {
 
     const view = document.getElementById("view");
 
+    const callDetail = hash.match(/^#\/calls\/([^/]+)$/);
+    if (callDetail) {
+      view.innerHTML = "";
+      await window.Views.CallDetail.render(view, callDetail[1]);
+      return;
+    }
+
     const agentChat = hash.match(/^#\/agents\/([^/]+)\/chat$/);
     if (agentChat) {
       view.innerHTML = "";

@@ -1,6 +1,6 @@
 import json
+import re
 import time
-from typing import Any
 
 from langgraph.graph import END, StateGraph
 
@@ -8,17 +8,122 @@ from .ollama_client import chat as ollama_chat
 from .state import AgentState
 from .tools.registry import execute_tool
 
-MAX_TOOL_HOPS = 5
+MAX_TOOL_HOPS = 2
+
+
+def _try_parse_text_tool_call(text: str) -> dict | None:
+    """
+    Parse a tool call emitted as JSON text by small models.
+    Returns {"name": str, "arguments": dict} or None.
+    """
+    if not text:
+        return None
+
+    t = text.strip()
+    t = re.sub(r"^```(?:json)?\s*", "", t)
+    t = re.sub(r"\s*```$", "", t)
+
+    start = t.find("{")
+    if start == -1:
+        return None
+
+    depth = 0
+    end = -1
+    for i in range(start, len(t)):
+        c = t[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+
+    if end == -1:
+        return None
+
+    candidate = t[start : end + 1]
+
+    try:
+        data = json.loads(candidate)
+    except Exception:
+        return None
+
+    name = None
+    args = None
+
+    if isinstance(data, dict):
+        if "function" in data and isinstance(data["function"], dict):
+            fn = data["function"]
+            name = fn.get("name")
+            args = fn.get("arguments") or fn.get("parameters") or {}
+        elif "name" in data:
+            name = data.get("name")
+            args = data.get("parameters") or data.get("arguments") or {}
+
+    if not name or not isinstance(name, str):
+        return None
+
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except Exception:
+            args = {}
+    if not isinstance(args, dict):
+        args = {}
+
+    cleaned = {}
+    for k, v in args.items():
+        if isinstance(v, str) and v.lower() in ("null", "none", ""):
+            continue
+        cleaned[k] = v
+    return {"name": name, "arguments": cleaned}
+
+
+def _summarize_tool_result(traces: list[dict]) -> str:
+    """
+    Fallback: turn raw tool results into a plain-English reply when the model
+    produces nothing useful.
+    """
+    if not traces:
+        return "I wasn't able to complete that."
+
+    last = traces[-1]
+    name = last.get("name", "tool")
+    status = last.get("status", "unknown")
+    output = last.get("output") or {}
+    error = last.get("error")
+
+    if status == "error" or error:
+        return f"I tried to use {name} but it failed: {error or 'unknown error'}."
+
+    if name == "get_current_time":
+        return f"The current time is {output.get('now', 'unknown')}."
+    if name == "calculate":
+        return f"The answer is {output.get('result', 'unknown')}."
+    if name == "calendar.create_event":
+        return (
+            f"I've created the event '{output.get('title', '')}' "
+            f"starting at {output.get('start_at', '')}."
+        )
+    if name == "crm.create_lead":
+        return f"I've created a lead for {output.get('name', 'unknown')}."
+    if name == "crm.search_contact":
+        c = output.get("count", 0)
+        if c == 0:
+            return "I couldn't find any matching contacts."
+        return f"I found {c} matching contact(s)."
+
+    return f"The {name} tool returned: {output}"
 
 
 async def _llm_node(state: AgentState) -> AgentState:
-    """
-    LLM node. Sends the system prompt + history + any tool schemas.
-    If the LLM requests tools, we set state['pending_tools'] and route to the tool node.
-    """
     system = state.get("system_prompt") or "You are a helpful AI assistant."
     history = state.get("messages") or []
-    tool_schemas = state.get("tool_schemas") or None
+    hops = state.get("tool_hops") or 0
+
+    # Only offer tools on hop 0
+    tool_schemas = state.get("tool_schemas") if hops == 0 else None
 
     messages = [{"role": "system", "content": system}] + history
 
@@ -29,8 +134,35 @@ async def _llm_node(state: AgentState) -> AgentState:
         tools=tool_schemas,
     )
 
-    state["last_content"] = result["content"]
-    state["last_tool_calls"] = result.get("tool_calls") or []
+    content = result["content"] or ""
+    tool_calls = result.get("tool_calls") or []
+
+    # Fallback parser - only on hop 0
+    if hops == 0 and not tool_calls and content:
+        print(f"[graph] hop=0 no structured tool_calls, content len={len(content)}", flush=True)
+        print(f"[graph] content head: {content[:200]!r}", flush=True)
+        parsed = _try_parse_text_tool_call(content)
+        print(f"[graph] parsed: {parsed}", flush=True)
+        if parsed:
+            tool_calls = [parsed]
+            content = ""
+    elif hops == 0 and tool_calls:
+        print(f"[graph] hop=0 structured tool_calls: {len(tool_calls)}", flush=True)
+    else:
+        print(f"[graph] hop={hops} content len={len(content)}", flush=True)
+
+    # Post-tool: replace garbage with a plain summary
+    if hops > 0:
+        looks_like_tool_json = (
+            '{"type":"function"' in content
+            or '"tool_calls"' in content
+            or (content.strip().startswith("{") and "function" in content)
+        )
+        if looks_like_tool_json or not content.strip():
+            content = _summarize_tool_result(state.get("traces") or [])
+
+    state["last_content"] = content
+    state["last_tool_calls"] = tool_calls
     state["meta"] = {
         "model": result["model"],
         "version": state.get("version"),
@@ -42,16 +174,11 @@ async def _llm_node(state: AgentState) -> AgentState:
 
 
 async def _tool_node(state: AgentState) -> AgentState:
-    """
-    Executes every tool call the LLM requested, appends the assistant's tool_call
-    message + each tool result to history, then returns control to the LLM.
-    """
     history = list(state.get("messages") or [])
     tool_calls = state.get("last_tool_calls") or []
     ctx = state.get("tool_ctx") or {}
     traces = state.get("traces") or []
 
-    # Represent the assistant's tool-call request
     history.append({
         "role": "assistant",
         "content": state.get("last_content") or "",
@@ -100,9 +227,7 @@ async def _tool_node(state: AgentState) -> AgentState:
 
 
 def _route_after_llm(state: AgentState) -> str:
-    if state.get("last_tool_calls"):
-        if (state.get("tool_hops") or 0) >= MAX_TOOL_HOPS:
-            return "end"
+    if state.get("last_tool_calls") and (state.get("tool_hops") or 0) < MAX_TOOL_HOPS:
         return "tools"
     return "end"
 
