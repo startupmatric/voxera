@@ -85,3 +85,38 @@ window.App = (() => {
 })();
 
 document.addEventListener("DOMContentLoaded", () => window.App.start());
+
+// ---------- Mobile sidebar ----------
+(function () {
+  const menu = document.getElementById("btn-menu");
+  const sidebar = document.getElementById("sidebar");
+  const backdrop = document.getElementById("sidebar-backdrop");
+  if (!menu || !sidebar || !backdrop) return;
+
+  function open() {
+    sidebar.classList.add("open");
+    backdrop.classList.add("show");
+  }
+  function close() {
+    sidebar.classList.remove("open");
+    backdrop.classList.remove("show");
+  }
+
+  menu.addEventListener("click", () => {
+    sidebar.classList.contains("open") ? close() : open();
+  });
+  backdrop.addEventListener("click", close);
+  sidebar.addEventListener("click", (e) => {
+    if (e.target.tagName === "A") close();
+  });
+})();
+
+// ---------- Header "Get Started" button ----------
+(function () {
+  const btn = document.getElementById("btn-header-register");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const org = document.getElementById("org");
+    if (org) { org.focus(); org.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  });
+})();

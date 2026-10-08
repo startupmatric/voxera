@@ -16,4 +16,3 @@ function makePlaceholder(name, description) {
   };
 }
 
-window.Views.Tools       = makePlaceholder("Tools", "Function tools available to agents -- calendar, CRM, custom HTTP endpoints.");

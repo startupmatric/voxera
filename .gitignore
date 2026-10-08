@@ -87,3 +87,24 @@ msg_body.json
 doc_body.json
 search_body.json
 *.body.json
+
+# Local one-shot fix scripts (never commit)
+fix_*.py
+
+# Local test bodies / artifacts
+login_bad.json
+kb_search.json
+weak.json
+short.json
+strong.json
+nodigit.json
+call_body.json
+msg_body.json
+doc_body.json
+search_body.json
+welcome1.json
+sample.webm
+test.wav
+piper_test.wav
+backend_piper_test.wav
+token.txt

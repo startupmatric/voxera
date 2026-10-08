@@ -1,0 +1,124 @@
+﻿/* ============================================================
+   Voxera — motion system
+   ============================================================ */
+
+/* ---------- Entry animations ---------- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulseDot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242,101,34,0.55); }
+  50%      { box-shadow: 0 0 0 6px rgba(242,101,34,0); }
+}
+
+@keyframes barGrow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* ---------- Utility classes ---------- */
+.fade-up { animation: fadeUp var(--dur) var(--ease) both; }
+.fade-in { animation: fadeIn var(--dur) var(--ease) both; }
+
+.stagger > * { animation: fadeUp var(--dur) var(--ease) both; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 40ms; }
+.stagger > *:nth-child(3) { animation-delay: 80ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(6) { animation-delay: 200ms; }
+.stagger > *:nth-child(7) { animation-delay: 240ms; }
+.stagger > *:nth-child(8) { animation-delay: 280ms; }
+
+/* ---------- Loading spinner ---------- */
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 600ms linear infinite;
+  vertical-align: -2px;
+  margin-right: 0.35rem;
+}
+
+/* ---------- Skeleton loader ---------- */
+.skeleton {
+  background: linear-gradient(90deg,
+    var(--panel-alt) 0%,
+    #F0F0EA 50%,
+    var(--panel-alt) 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: var(--radius-sm);
+  min-height: 14px;
+}
+
+.skeleton-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.skeleton-row > span { height: 12px; }
+
+/* ---------- Status dot ---------- */
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: middle;
+}
+.dot.live {
+  background: var(--accent);
+  animation: pulseDot 1.8s var(--ease) infinite;
+}
+
+/* ---------- Page transition ---------- */
+.page-enter { animation: fadeUp 180ms var(--ease) both; }
+
+/* ---------- Trace bar growth ---------- */
+.trace-bar-grow {
+  transform-origin: left center;
+  animation: barGrow 500ms var(--ease) both;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .skeleton {
+    animation: none !important;
+    background: var(--panel-alt) !important;
+  }
+
+  .trace-bar-grow { animation: none !important; transform: none !important; }
+  .stagger > * { animation: none !important; }
+}

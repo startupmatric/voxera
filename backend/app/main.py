@@ -4,12 +4,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from .auth import router as auth_router
 from .config import settings
 from .database import check_database, check_redis
+from .middleware.rate_limit import RateLimitMiddleware
 from .routers import (
     agents,
     calls,
     chat,
     debug,
     evaluations,
+    health,
     knowledge,
     me,
     organizations,
@@ -19,11 +21,15 @@ from .routers import (
     ws_calls,
 )
 
-app = FastAPI(title=settings.app_name, version="0.12.0")
+app = FastAPI(title=settings.app_name, version="0.13.0")
 
+# Rate limit BEFORE anything else
+app.add_middleware(RateLimitMiddleware)
+
+# CORS: restricted origins from settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,7 +37,7 @@ app.add_middleware(
 
 
 @app.get("/health")
-def health():
+def health_liveness():
     return {"status": "ok", "service": "voxera"}
 
 
@@ -47,9 +53,10 @@ def health_redis():
 
 @app.get("/")
 def root():
-    return {"service": settings.app_name, "env": settings.app_env, "version": "0.12.0"}
+    return {"service": settings.app_name, "env": settings.app_env, "version": "0.13.0"}
 
 
+app.include_router(health.router)
 app.include_router(auth_router.router)
 app.include_router(me.router)
 app.include_router(organizations.router)
