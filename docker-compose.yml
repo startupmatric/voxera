@@ -73,7 +73,7 @@
     restart: unless-stopped
 
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: voxera-postgres
     environment:
       POSTGRES_USER: voxera

@@ -17,6 +17,7 @@ from .evaluation import (
     EvaluationResult,
 )
 from .debug_report import DebugReport
+from .knowledge import KnowledgeDocument, KnowledgeChunk
 
 __all__ = [
     "Base",
@@ -36,4 +37,6 @@ __all__ = [
     "EvaluationRun",
     "EvaluationResult",
     "DebugReport",
+    "KnowledgeDocument",
+    "KnowledgeChunk",
 ]

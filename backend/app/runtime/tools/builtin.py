@@ -2,10 +2,11 @@ import ast
 import operator as _op
 from datetime import datetime, timezone
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ...models import CalendarEvent, Customer, Lead
+from ...knowledge import service as knowledge_service
 
 # ------------------------------------------------------------------
 # get_current_time
@@ -56,40 +57,20 @@ def _calc_handler(inp: _CalcInput, ctx: dict) -> dict:
 
 
 class _CreateEventInput(BaseModel):
-    model_config = {"coerce_numbers_to_str": False}
-
     title: str
-    start_at: str = Field(..., description="ISO 8601 datetime in UTC, e.g. '2026-10-04T15:00:00+00:00'")
-    duration_minutes: int = Field(60, description="Length in minutes. Use 60 for one hour.")
+    start_at: str = Field(..., description="ISO 8601 datetime, e.g. '2026-10-04T15:00:00+00:00'")
+    duration_minutes: int = Field(60, ge=0, le=1440)
     notes: str | None = None
-
-    @field_validator("duration_minutes", mode="before")
-    @classmethod
-    def _coerce_duration(cls, v):
-        # Accept int, str, float, or None; default to 60 for anything unusable
-        if v is None or v == "":
-            return 60
-        try:
-            n = int(float(v))
-        except (TypeError, ValueError):
-            return 60
-        if n <= 0:
-            return 60
-        if n > 1440:
-            return 1440
-        return n
 
 
 def _create_event_handler(inp: _CreateEventInput, ctx: dict) -> dict:
     db: Session = ctx["db"]
     tenant_id: str = ctx["tenant_id"]
 
-    # Robust ISO parsing: accept Z, missing offset, or slight variations
     raw = inp.start_at.strip().replace("Z", "+00:00")
     try:
         start = datetime.fromisoformat(raw)
     except ValueError:
-        # Fallback: try without timezone suffix
         start = datetime.fromisoformat(raw.replace("+00:00", ""))
     if start.tzinfo is None:
         start = start.replace(tzinfo=timezone.utc)
@@ -180,3 +161,43 @@ def _create_lead_handler(inp: _CreateLeadInput, ctx: dict) -> dict:
     db.refresh(lead)
 
     return {"id": lead.id, "name": lead.name, "status": lead.status}
+
+
+# ------------------------------------------------------------------
+# knowledge.search  (RAG)
+# ------------------------------------------------------------------
+
+
+class _KnowledgeSearchInput(BaseModel):
+    query: str = Field(..., description="Natural language search query")
+
+
+def _knowledge_search_handler(inp: _KnowledgeSearchInput, ctx: dict) -> dict:
+    import asyncio
+    from ...knowledge.service import search as kn_search
+    from ...database import SessionLocal
+
+    # We're called from a synchronous tool node; create a fresh session
+    # to avoid mixing ORM state across threads/events.
+    db = SessionLocal()
+    try:
+        results = asyncio.get_event_loop().run_until_complete(
+            kn_search(db, ctx["tenant_id"], inp.query, top_k=5)
+        )
+    except RuntimeError:
+        # no running loop in this thread
+        results = asyncio.run(kn_search(db, ctx["tenant_id"], inp.query, top_k=5))
+    finally:
+        db.close()
+
+    return {
+        "count": len(results),
+        "results": [
+            {
+                "document": r["document_name"],
+                "content": r["content"][:600],
+                "score": round(r["score"], 4),
+            }
+            for r in results
+        ],
+    }

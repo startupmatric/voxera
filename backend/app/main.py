@@ -10,6 +10,7 @@ from .routers import (
     chat,
     debug,
     evaluations,
+    knowledge,
     me,
     organizations,
     tenants,
@@ -18,7 +19,7 @@ from .routers import (
     ws_calls,
 )
 
-app = FastAPI(title=settings.app_name, version="0.11.0")
+app = FastAPI(title=settings.app_name, version="0.12.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,7 +47,7 @@ def health_redis():
 
 @app.get("/")
 def root():
-    return {"service": settings.app_name, "env": settings.app_env, "version": "0.11.0"}
+    return {"service": settings.app_name, "env": settings.app_env, "version": "0.12.0"}
 
 
 app.include_router(auth_router.router)
@@ -60,4 +61,5 @@ app.include_router(chat.router)
 app.include_router(calls.router)
 app.include_router(evaluations.router)
 app.include_router(debug.router)
+app.include_router(knowledge.router)
 app.include_router(ws_calls.router)

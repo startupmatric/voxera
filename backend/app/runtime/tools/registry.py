@@ -3,11 +3,13 @@ from .builtin import (
     _CalcInput,
     _CreateEventInput,
     _CreateLeadInput,
+    _KnowledgeSearchInput,
     _SearchContactInput,
     _TimeInput,
     _calc_handler,
     _create_event_handler,
     _create_lead_handler,
+    _knowledge_search_handler,
     _search_contact_handler,
     _time_handler,
 )
@@ -52,6 +54,12 @@ def register_all() -> None:
         description="Create a sales lead in the CRM.",
         input_model=_CreateLeadInput,
         handler=_create_lead_handler,
+    ))
+    _register(ToolDef(
+        name="knowledge.search",
+        description="Search the tenant's knowledge base for relevant documents. Use this when the user asks a question that may be covered by uploaded documents.",
+        input_model=_KnowledgeSearchInput,
+        handler=_knowledge_search_handler,
     ))
 
 

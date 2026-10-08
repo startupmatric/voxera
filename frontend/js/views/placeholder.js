@@ -17,4 +17,3 @@ function makePlaceholder(name, description) {
 }
 
 window.Views.Tools       = makePlaceholder("Tools", "Function tools available to agents -- calendar, CRM, custom HTTP endpoints.");
-window.Views.Knowledge   = makePlaceholder("Knowledge", "Vector-indexed documents and chunks used for retrieval-augmented agents.");
